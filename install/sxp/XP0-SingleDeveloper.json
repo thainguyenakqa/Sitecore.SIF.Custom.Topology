@@ -698,7 +698,7 @@
         "Generate.SqlForms.Password": "[randomstring(Length:20,DisAllowSpecial:True,EnforceComplexity:True)]",
 
         "SqlExmMaster.Password": "[if(variable('Test.SqlExmMaster.Password'),variable('Generate.SqlExmMaster.Password'),parameter('SqlExmMasterPassword'))]",
-        "c:SqlExmMaster.Password": "[variable('SqlExmMaster.Password')]",
+        "SitecoreXP0:SqlExmMaster.Password": "[variable('SqlExmMaster.Password')]",
         "SitecoreXP1CD:SqlExmMaster.Password": "[variable('SqlExmMaster.Password')]",
         "Test.SqlExmMaster.Password": "[equal(parameter('SqlExmMasterPassword'),'SIF-Default')]",
         "Generate.SqlExmMaster.Password": "[randomstring(Length:20,DisAllowSpecial:True,EnforceComplexity:True)]",

@@ -1,141 +1,76 @@
-## Customized
-Function Resolve-ItemPath {
-    param (
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullorEmpty()]
-        [string] $Path
-    )
-    process {
-        if ([string]::IsNullOrWhiteSpace($Path)) {
-            throw "Parameter could not be validated because it contains only whitespace. Please check script parameters."
-        }
-        $itemPath = Resolve-Path -Path $Path -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ([string]::IsNullOrEmpty($itemPath) -or (-not (Test-Path $itemPath))) {
-            throw "Path [$Path] could not be resolved. Please check script parameters."
-        }
+Function Invoke-CreatePerformanceCountersTask {   
 
-        Write-Host "Found [$itemPath]."
-        return $itemPath
-    }
+	try {
+		$countersVersion = "1.0.2"
+		$ccdTypeName = "System.Diagnostics.CounterCreationData"       
+		$perfCounterCategoryName = "SitecoreCommerceEngine-$countersVersion"
+		$perfCounterInformation = "Performance Counters for Sitecore Commerce Engine"
+		$commandCountersName = "SitecoreCommerceCommands-$countersVersion"
+		$metricsCountersName = "SitecoreCommerceMetrics-$countersVersion"
+		$listCountersName = "SitecoreCommerceLists-$countersVersion"
+		$counterCollectionName = "SitecoreCommerceCounters-$countersVersion"
+		[array]$allCounters = $commandCountersName,$metricsCountersName,$listCountersName,$counterCollectionName
+
+		Write-Host "Attempting to delete existing Sitecore Commmerce Engine performance counters"
+
+		# delete all counters
+		foreach($counter in $allCounters)
+		{
+			$categoryExists = [System.Diagnostics.PerformanceCounterCategory]::Exists($counter)
+			If ($categoryExists)
+			{
+				Write-Host "Deleting performance counters $counter" -ForegroundColor Green
+				[System.Diagnostics.PerformanceCounterCategory]::Delete($counter); 
+			}
+			Else
+			{
+				Write-Warning "$counter does not exist, no need to delete"
+			}
+		}
+
+		Write-Host "`nAttempting to create Sitecore Commmerce Engine performance counters"
+
+		# command counters
+		Write-Host "`nCreating $commandCountersName performance counters" -ForegroundColor Green
+		$CounterCommandCollection = New-Object System.Diagnostics.CounterCreationDataCollection
+		$CounterCommandCollection.Add( (New-Object $ccdTypeName "CommandsRun", "Number of times a Command has been run", NumberOfItems32) )
+		$CounterCommandCollection.Add( (New-Object $ccdTypeName "CommandRun", "Command Process Time (ms)", NumberOfItems32) )
+		$CounterCommandCollection.Add( (New-Object $ccdTypeName "CommandRunAverage", "Average of time (ms) for a Command to Process", AverageCount64) )
+		$CounterCommandCollection.Add( (New-Object $ccdTypeName "CommandRunAverageBase", "Average of time (ms) for a Command to Process Base", AverageBase) )
+		[System.Diagnostics.PerformanceCounterCategory]::Create($commandCountersName, $perfCounterInformation, [Diagnostics.PerformanceCounterCategoryType]::MultiInstance, $CounterCommandCollection) | out-null
+
+		# metrics counters
+		Write-Host "`nCreating $metricsCountersName performance counters" -ForegroundColor Green
+		$CounterMetricCollection = New-Object System.Diagnostics.CounterCreationDataCollection
+		$CounterMetricCollection.Add( (New-Object $ccdTypeName "MetricCount", "Count of Metrics", NumberOfItems32) )
+		$CounterMetricCollection.Add( (New-Object $ccdTypeName "MetricAverage", "Average of time (ms) for a Metric", AverageCount64) )
+		$CounterMetricCollection.Add( (New-Object $ccdTypeName "MetricAverageBase", "Average of time (ms) for a Metric Base", AverageBase) )
+		[System.Diagnostics.PerformanceCounterCategory]::Create($metricsCountersName, $perfCounterInformation, [Diagnostics.PerformanceCounterCategoryType]::MultiInstance, $CounterMetricCollection) | out-null
+
+		# list counters
+		Write-Host "`nCreating $listCountersName performance counters" -ForegroundColor Green
+		$ListCounterCollection = New-Object System.Diagnostics.CounterCreationDataCollection
+		$ListCounterCollection.Add( (New-Object $ccdTypeName "ListCount", "Count of Items in the CommerceList", NumberOfItems32) )
+		[System.Diagnostics.PerformanceCounterCategory]::Create($listCountersName, $perfCounterInformation, [Diagnostics.PerformanceCounterCategoryType]::MultiInstance, $ListCounterCollection) | out-null
+
+		# counter collection
+		Write-Host "`nCreating $counterCollectionName performance counters" -ForegroundColor Green
+		$CounterCollection = New-Object System.Diagnostics.CounterCreationDataCollection
+		$CounterCollection.Add( (New-Object $ccdTypeName "ListItemProcess", "Average of time (ms) for List Item to Process", AverageCount64) )
+		$CounterCollection.Add( (New-Object $ccdTypeName "ListItemProcessBase", "Average of time (ms) for a List Item to Process Base", AverageBase) )
+		[System.Diagnostics.PerformanceCounterCategory]::Create($counterCollectionName, $perfCounterInformation, [Diagnostics.PerformanceCounterCategoryType]::MultiInstance, $CounterCollection) | out-null          
+	}
+	catch {
+		Write-Error $_
+	}
 }
 
-# Solr Port.
-$SolrPort = "8983"
-# Solr installation root.
-$SolrInstallRoot = "$($Env:SYSTEMDRIVE)\"
-# Solr version
-$SolrVersion = "8.4.0"
-##
-
-# The Prefix that will be used on SOLR, Website and Database instances.
-$Prefix = "ajax"
-# The Password for the Sitecore Admin User. This will be regenerated if left on the default.
-$SitecoreAdminPassword = "b"
-# The root folder with the license file and WDP files.
-$SCInstallRoot = "$PSScriptRoot\sxp"
-# Root folder to install the site to. If left on the default [systemdrive]:\\inetpub\\wwwroot will be used
-$SitePhysicalRoot = Resolve-ItemPath -Path "$PSScriptRoot\..\www"
-# The name for the XConnect service.
-$XConnectSiteName = "$prefix.xconnect"
-# The Sitecore site instance name.
-$SitecoreSiteName = "$prefix.cm"
-# Identity Server site name
-$IdentityServerSiteName = "$prefix.identityserver"
-# The Path to the license file
-$LicenseFile = Resolve-ItemPath -Path "$PSScriptRoot\license.xml"
-# The URL of the Solr Server
-$SolrUrl = "https://localhost:$SolrPort/solr"
-# The Folder that Solr has been installed to.
-$SolrRoot = "$SolrInstallRoot\$Prefix-Solr-$SolrVersion"
-# The Name of the Solr Service.
-$SolrService = "$Prefix-Solr-$SolrVersion"
-# The DNS name or IP of the SQL Instance.
-$SqlServer = "localhost"
-# A SQL user with sysadmin privileges.
-$SqlAdminUser = "sa"
-# The password for $SQLAdminUser.
-$SqlAdminPassword = "1qaz#EDC"
-# The path to the XConnect Package to Deploy.
-$XConnectPackage = (Get-ChildItem "$SCInstallRoot\Sitecore * rev. * (OnPrem)_xp0xconnect.scwdp.zip").FullName
-# The path to the Sitecore Package to Deploy.
-$SitecorePackage = (Get-ChildItem "$SCInstallRoot\Sitecore * rev. * (OnPrem)_single.scwdp.zip").FullName
-# The path to the Identity Server Package to Deploy.
-$IdentityServerPackage = (Get-ChildItem "$SCInstallRoot\Sitecore.IdentityServer * rev. * (OnPrem)_identityserver.scwdp.zip").FullName
-# The Identity Server password recovery URL, this should be the URL of the CM Instance
-$PasswordRecoveryUrl = "https://$SitecoreSiteName"
-# The URL of the Identity Server
-$SitecoreIdentityAuthority = "https://$IdentityServerSiteName"
-# The URL of the XconnectService
-$XConnectCollectionService = "https://$XConnectSiteName"
-# The random string key used for establishing connection with IdentityService. This will be regenerated if left on the default.
-$ClientSecret = "SIF-Default"
-# Pipe-separated list of instances (URIs) that are allowed to login via Sitecore Identity.
-$AllowedCorsOrigins = "https://$SitecoreSiteName"
-
-## Customized
-# The path to the Sitecore CD Package to Deploy.
-$SitecoreXP1CDPackage = (Get-ChildItem "$SCInstallRoot\Sitecore * rev. * (OnPrem)_cd.scwdp.zip").FullName
-# The Sitecore CD instance name.
-$SitecoreXP1CDSitename = "$Prefix.cd"
-##
-
-Push-Location $PSScriptRoot\sxp
-
-# Install SOLR
-$solrParams = @{
-    Path = "$SCInstallRoot\Solr-SingleDeveloper.json"
-    SolrServicePrefix = "$Prefix-"
-    SolrPort = $SolrPort
-    SolrInstallRoot = $SolrInstallRoot
-    SolrVersion = $SolrVersion
-}
-Install-SitecoreConfiguration @solrParams *>&1 | Tee-Object solr.log
-
-# Install XP0 via combined partials file.
-$singleDeveloperParams = @{
-    Path = "$SCInstallRoot\XP0-SingleDeveloper.json"
-    SqlServer = $SqlServer
-    SqlAdminUser = $SqlAdminUser
-    SqlAdminPassword = $SqlAdminPassword
-    SitecoreAdminPassword = $SitecoreAdminPassword
-    SolrUrl = $SolrUrl
-    SolrRoot = $SolrRoot
-    SolrService = $SolrService
-    Prefix = $Prefix
-    XConnectCertificateName = $XConnectSiteName
-    IdentityServerCertificateName = $IdentityServerSiteName
-    IdentityServerSiteName = $IdentityServerSiteName
-    LicenseFile = $LicenseFile
-    XConnectPackage = $XConnectPackage
-    SitecorePackage = $SitecorePackage
-    IdentityServerPackage = $IdentityServerPackage
-    XConnectSiteName = $XConnectSiteName
-    SitecoreSitename = $SitecoreSiteName
-    PasswordRecoveryUrl = $PasswordRecoveryUrl
-    SitecoreIdentityAuthority = $SitecoreIdentityAuthority
-    XConnectCollectionService = $XConnectCollectionService
-    ClientSecret = $ClientSecret
-    AllowedCorsOrigins = $AllowedCorsOrigins
-    SitePhysicalRoot = $SitePhysicalRoot
-    
-## Customized
-    SitecoreXP1CDPackage = $SitecoreXP1CDPackage
-    SitecoreXP1CDSitename = $SitecoreXP1CDSitename
-##
-}
-
-Install-SitecoreConfiguration @singleDeveloperParams *>&1 | Tee-Object XP0-SingleDeveloper.log
-
-# Uncomment the below line and comment out the above if you want to remove the XP0 SingleDeveloper Config
-#Uninstall-SitecoreConfiguration @singleDeveloperParams *>&1 | Tee-Object XP0-SingleDeveloper-Uninstall.log
-
-Pop-Location
-
+Register-SitecoreInstallExtension -Command Invoke-CreatePerformanceCountersTask -As CreatePerformanceCounters -Type Task -Force
 # SIG # Begin signature block
 # MIIXwQYJKoZIhvcNAQcCoIIXsjCCF64CAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUeGAz+NczayJIZTbPRKZxRFAQ
-# Y8GgghL8MIID7jCCA1egAwIBAgIQfpPr+3zGTlnqS5p31Ab8OzANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQURdGI7turAkjLItMQ6DdbtaxD
+# uQmgghL8MIID7jCCA1egAwIBAgIQfpPr+3zGTlnqS5p31Ab8OzANBgkqhkiG9w0B
 # AQUFADCBizELMAkGA1UEBhMCWkExFTATBgNVBAgTDFdlc3Rlcm4gQ2FwZTEUMBIG
 # A1UEBxMLRHVyYmFudmlsbGUxDzANBgNVBAoTBlRoYXd0ZTEdMBsGA1UECxMUVGhh
 # d3RlIENlcnRpZmljYXRpb24xHzAdBgNVBAMTFlRoYXd0ZSBUaW1lc3RhbXBpbmcg
@@ -241,22 +176,22 @@ Pop-Location
 # bTExMC8GA1UEAxMoRGlnaUNlcnQgU0hBMiBBc3N1cmVkIElEIENvZGUgU2lnbmlu
 # ZyBDQQIQB6Zc7QsNL9EyTYMCYZHvVTAJBgUrDgMCGgUAoHAwEAYKKwYBBAGCNwIB
 # DDECMAAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQwHAYKKwYBBAGCNwIBCzEO
-# MAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkEMRYEFIuO9OxnfSZtMu1Iow+a63pL
-# 14sSMA0GCSqGSIb3DQEBAQUABIIBAKiCspaxn7bSZG+YXo2jwHVVBXA08m/8Obhs
-# TjBKVAgNgdZYQ9/tadnpabiXhf/ul35RyRRI1SaiWr+DBONxND7sW5Czn7JiPt5z
-# ay+XUHsNSu6qFx+H3L0yAgFGfl/wlam5AkeitR6gwxBplIP/dH15rniJb3CaBHaN
-# kxfs8MIGmzUCugc45RvRaXxkmWX8vCfpt1X5YWNu1vHQG0LBK6xP4kpNWR+5UVh/
-# HbfxisjgMrNHLlYNMJgSKNftOpF90fgK14zINHYOZHFWgewAtf5h9fC/ExEQjXq1
-# KeyuM0kW7oHzlvrvqt+HB9IVwANI+dub/eS3vHj/JV1GR2BjxnihggILMIICBwYJ
+# MAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkEMRYEFNEEzTVNgk53iYRkwX+pBSqz
+# CydrMA0GCSqGSIb3DQEBAQUABIIBAAQzD00sqTIjOHvngTeNUBWnDMPXgrucUvkl
+# A+hB6FmeFkd5MYzKPh4WsgzHYWVzf7jhwW5THL1F+umDSTz7gbvqIQbGqbDHL9Y3
+# M+duQ2TRrB0cLOgFFfKfOTT1odvvgZbZ4DKosxVa26PxkH2ZNawd7sxZejVO1aYZ
+# yxQ+cXx3mzkq1GyivjFvM7+rwQpGiA2CiPFl22w97M4c/9mysZcCihDseY+UnsDF
+# MNZcO3HU9Qwt8sVoPZ24bK2MWbJ7F65G49+c5+WQepeu16wXESIT3fQuGCR1dzQe
+# zyVx7utcgu9IXGV7bCSSXC13inUkD5ptjGzjUl/a2evpmQLLWoyhggILMIICBwYJ
 # KoZIhvcNAQkGMYIB+DCCAfQCAQEwcjBeMQswCQYDVQQGEwJVUzEdMBsGA1UEChMU
 # U3ltYW50ZWMgQ29ycG9yYXRpb24xMDAuBgNVBAMTJ1N5bWFudGVjIFRpbWUgU3Rh
 # bXBpbmcgU2VydmljZXMgQ0EgLSBHMgIQDs/0OMj+vzVuBNhqmBsaUDAJBgUrDgMC
 # GgUAoF0wGAYJKoZIhvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcN
-# MjAwNTIwMTM0MzE2WjAjBgkqhkiG9w0BCQQxFgQUNHljh0VLrrH4wz85kVzfGbww
-# uXIwDQYJKoZIhvcNAQEBBQAEggEAjDClMBinMY2uBcca2tUcb2+Pe4QQyDq/A6Te
-# Hsv7VqLxrbY7Ax+Nm3UGkFn44rRgPxF53Zueujcbf9dgzWpWLwrW1aedybLvkywy
-# Rvi4u7qCNWhjmZuqolklTN6b186G8Mpfjqcf2LmyvD8/qEYyUdLus3I9K9KrOttb
-# cPJOJiD/T/RGTIBUa/TSi2xgCI7QeV6TABgUUFhU70IYWq9BYRvqeynQ70nt/xDU
-# BwXcJgYce7RKNXuSRAU3SKLDfk6mRFzVmV7YTAYr1k3+SeivQ4avAEp429X582ks
-# ILaKCLi1dRTARndiAs0Sy1n3AiL1/Lr+WU5z/19aoWGZThacKg==
+# MjAwNzI5MTQzMjI2WjAjBgkqhkiG9w0BCQQxFgQUgBO7Pp+6tk0kLN9OF0Bvk354
+# KkUwDQYJKoZIhvcNAQEBBQAEggEAnySNUIRjb/5pXG2BmPFBInlaMyySomjS1esl
+# 6d2OdxBwAE5ZYU0ifUFkbfA3JuuCr+FW1cEPKsqaDZeeph/IfzFKVwv3gnSp0/oA
+# X6gKPb0ICqGATPebWZgSVRHTEWfpL+4ZTxiG8J/JeXh73FkF9N5NWrfM8Nj00Jp9
+# iu+OQs7h9ZPlSLxZVT3z1hi5+1zNsohC+Wj8Qum9YvZMucdR/ZMbypNA+1bU3ZcR
+# jHlc8yYMqRif3oT60UN2ClS3XZ++EsK39OJCuQVXn4dykJ1Uh2phrdMNf/oZuTSu
+# vmPd5CZ8ja5GiIiyUrJdr47sDO592YA7JhABTu6Yt+n1HmWzPA==
 # SIG # End signature block

@@ -1,141 +1,12 @@
-## Customized
-Function Resolve-ItemPath {
-    param (
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullorEmpty()]
-        [string] $Path
-    )
-    process {
-        if ([string]::IsNullOrWhiteSpace($Path)) {
-            throw "Parameter could not be validated because it contains only whitespace. Please check script parameters."
-        }
-        $itemPath = Resolve-Path -Path $Path -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ([string]::IsNullOrEmpty($itemPath) -or (-not (Test-Path $itemPath))) {
-            throw "Path [$Path] could not be resolved. Please check script parameters."
-        }
+Set-Alias -Name Invoke-InstallSitecoreConfigurationTask -Value Install-SitecoreConfiguration
 
-        Write-Host "Found [$itemPath]."
-        return $itemPath
-    }
-}
 
-# Solr Port.
-$SolrPort = "8983"
-# Solr installation root.
-$SolrInstallRoot = "$($Env:SYSTEMDRIVE)\"
-# Solr version
-$SolrVersion = "8.4.0"
-##
-
-# The Prefix that will be used on SOLR, Website and Database instances.
-$Prefix = "ajax"
-# The Password for the Sitecore Admin User. This will be regenerated if left on the default.
-$SitecoreAdminPassword = "b"
-# The root folder with the license file and WDP files.
-$SCInstallRoot = "$PSScriptRoot\sxp"
-# Root folder to install the site to. If left on the default [systemdrive]:\\inetpub\\wwwroot will be used
-$SitePhysicalRoot = Resolve-ItemPath -Path "$PSScriptRoot\..\www"
-# The name for the XConnect service.
-$XConnectSiteName = "$prefix.xconnect"
-# The Sitecore site instance name.
-$SitecoreSiteName = "$prefix.cm"
-# Identity Server site name
-$IdentityServerSiteName = "$prefix.identityserver"
-# The Path to the license file
-$LicenseFile = Resolve-ItemPath -Path "$PSScriptRoot\license.xml"
-# The URL of the Solr Server
-$SolrUrl = "https://localhost:$SolrPort/solr"
-# The Folder that Solr has been installed to.
-$SolrRoot = "$SolrInstallRoot\$Prefix-Solr-$SolrVersion"
-# The Name of the Solr Service.
-$SolrService = "$Prefix-Solr-$SolrVersion"
-# The DNS name or IP of the SQL Instance.
-$SqlServer = "localhost"
-# A SQL user with sysadmin privileges.
-$SqlAdminUser = "sa"
-# The password for $SQLAdminUser.
-$SqlAdminPassword = "1qaz#EDC"
-# The path to the XConnect Package to Deploy.
-$XConnectPackage = (Get-ChildItem "$SCInstallRoot\Sitecore * rev. * (OnPrem)_xp0xconnect.scwdp.zip").FullName
-# The path to the Sitecore Package to Deploy.
-$SitecorePackage = (Get-ChildItem "$SCInstallRoot\Sitecore * rev. * (OnPrem)_single.scwdp.zip").FullName
-# The path to the Identity Server Package to Deploy.
-$IdentityServerPackage = (Get-ChildItem "$SCInstallRoot\Sitecore.IdentityServer * rev. * (OnPrem)_identityserver.scwdp.zip").FullName
-# The Identity Server password recovery URL, this should be the URL of the CM Instance
-$PasswordRecoveryUrl = "https://$SitecoreSiteName"
-# The URL of the Identity Server
-$SitecoreIdentityAuthority = "https://$IdentityServerSiteName"
-# The URL of the XconnectService
-$XConnectCollectionService = "https://$XConnectSiteName"
-# The random string key used for establishing connection with IdentityService. This will be regenerated if left on the default.
-$ClientSecret = "SIF-Default"
-# Pipe-separated list of instances (URIs) that are allowed to login via Sitecore Identity.
-$AllowedCorsOrigins = "https://$SitecoreSiteName"
-
-## Customized
-# The path to the Sitecore CD Package to Deploy.
-$SitecoreXP1CDPackage = (Get-ChildItem "$SCInstallRoot\Sitecore * rev. * (OnPrem)_cd.scwdp.zip").FullName
-# The Sitecore CD instance name.
-$SitecoreXP1CDSitename = "$Prefix.cd"
-##
-
-Push-Location $PSScriptRoot\sxp
-
-# Install SOLR
-$solrParams = @{
-    Path = "$SCInstallRoot\Solr-SingleDeveloper.json"
-    SolrServicePrefix = "$Prefix-"
-    SolrPort = $SolrPort
-    SolrInstallRoot = $SolrInstallRoot
-    SolrVersion = $SolrVersion
-}
-Install-SitecoreConfiguration @solrParams *>&1 | Tee-Object solr.log
-
-# Install XP0 via combined partials file.
-$singleDeveloperParams = @{
-    Path = "$SCInstallRoot\XP0-SingleDeveloper.json"
-    SqlServer = $SqlServer
-    SqlAdminUser = $SqlAdminUser
-    SqlAdminPassword = $SqlAdminPassword
-    SitecoreAdminPassword = $SitecoreAdminPassword
-    SolrUrl = $SolrUrl
-    SolrRoot = $SolrRoot
-    SolrService = $SolrService
-    Prefix = $Prefix
-    XConnectCertificateName = $XConnectSiteName
-    IdentityServerCertificateName = $IdentityServerSiteName
-    IdentityServerSiteName = $IdentityServerSiteName
-    LicenseFile = $LicenseFile
-    XConnectPackage = $XConnectPackage
-    SitecorePackage = $SitecorePackage
-    IdentityServerPackage = $IdentityServerPackage
-    XConnectSiteName = $XConnectSiteName
-    SitecoreSitename = $SitecoreSiteName
-    PasswordRecoveryUrl = $PasswordRecoveryUrl
-    SitecoreIdentityAuthority = $SitecoreIdentityAuthority
-    XConnectCollectionService = $XConnectCollectionService
-    ClientSecret = $ClientSecret
-    AllowedCorsOrigins = $AllowedCorsOrigins
-    SitePhysicalRoot = $SitePhysicalRoot
-    
-## Customized
-    SitecoreXP1CDPackage = $SitecoreXP1CDPackage
-    SitecoreXP1CDSitename = $SitecoreXP1CDSitename
-##
-}
-
-Install-SitecoreConfiguration @singleDeveloperParams *>&1 | Tee-Object XP0-SingleDeveloper.log
-
-# Uncomment the below line and comment out the above if you want to remove the XP0 SingleDeveloper Config
-#Uninstall-SitecoreConfiguration @singleDeveloperParams *>&1 | Tee-Object XP0-SingleDeveloper-Uninstall.log
-
-Pop-Location
-
+Register-SitecoreInstallExtension -Command Invoke-InstallSitecoreConfigurationTask -As InstallSitecoreConfiguration -Type Task -Force
 # SIG # Begin signature block
 # MIIXwQYJKoZIhvcNAQcCoIIXsjCCF64CAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUeGAz+NczayJIZTbPRKZxRFAQ
-# Y8GgghL8MIID7jCCA1egAwIBAgIQfpPr+3zGTlnqS5p31Ab8OzANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU9K9CfxBC+WcKqTyTaLgB4t3Z
+# 7Q+gghL8MIID7jCCA1egAwIBAgIQfpPr+3zGTlnqS5p31Ab8OzANBgkqhkiG9w0B
 # AQUFADCBizELMAkGA1UEBhMCWkExFTATBgNVBAgTDFdlc3Rlcm4gQ2FwZTEUMBIG
 # A1UEBxMLRHVyYmFudmlsbGUxDzANBgNVBAoTBlRoYXd0ZTEdMBsGA1UECxMUVGhh
 # d3RlIENlcnRpZmljYXRpb24xHzAdBgNVBAMTFlRoYXd0ZSBUaW1lc3RhbXBpbmcg
@@ -241,22 +112,22 @@ Pop-Location
 # bTExMC8GA1UEAxMoRGlnaUNlcnQgU0hBMiBBc3N1cmVkIElEIENvZGUgU2lnbmlu
 # ZyBDQQIQB6Zc7QsNL9EyTYMCYZHvVTAJBgUrDgMCGgUAoHAwEAYKKwYBBAGCNwIB
 # DDECMAAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQwHAYKKwYBBAGCNwIBCzEO
-# MAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkEMRYEFIuO9OxnfSZtMu1Iow+a63pL
-# 14sSMA0GCSqGSIb3DQEBAQUABIIBAKiCspaxn7bSZG+YXo2jwHVVBXA08m/8Obhs
-# TjBKVAgNgdZYQ9/tadnpabiXhf/ul35RyRRI1SaiWr+DBONxND7sW5Czn7JiPt5z
-# ay+XUHsNSu6qFx+H3L0yAgFGfl/wlam5AkeitR6gwxBplIP/dH15rniJb3CaBHaN
-# kxfs8MIGmzUCugc45RvRaXxkmWX8vCfpt1X5YWNu1vHQG0LBK6xP4kpNWR+5UVh/
-# HbfxisjgMrNHLlYNMJgSKNftOpF90fgK14zINHYOZHFWgewAtf5h9fC/ExEQjXq1
-# KeyuM0kW7oHzlvrvqt+HB9IVwANI+dub/eS3vHj/JV1GR2BjxnihggILMIICBwYJ
+# MAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkEMRYEFM7olFvoBgb0MAzI2Qo/d2C6
+# Sy7bMA0GCSqGSIb3DQEBAQUABIIBADubtTToO+FCuFb1gNKV7J/jcYuetokb9Bku
+# Wlhc8JbCzz9NUDAylcGqrc7CDEi0TknTRrrONrUfIpa6Hm6KEp/YLnEWtrEq0LcO
+# +/xB/75NVarHLeXm1NK6ymQdAOTyU3ShegAwKyk/sZBFNRDm1U6wj9+eSqMdrtMT
+# 4ec+EX21hhYyycppfi7MySwBvugyV7rrm5cymk3otXLLRke1BabxW0wQuakz/zaN
+# VO8RdO1wAeTmQgiU/S0v3EUGry0PUrYKF1ZWlhHkDAG/mIMRUdekLZJHGF3TwDUZ
+# ji/4gB6+Ez3sIW1ITY+kXEBHjNLksKFKRfwACc0taIzZy5f7+42hggILMIICBwYJ
 # KoZIhvcNAQkGMYIB+DCCAfQCAQEwcjBeMQswCQYDVQQGEwJVUzEdMBsGA1UEChMU
 # U3ltYW50ZWMgQ29ycG9yYXRpb24xMDAuBgNVBAMTJ1N5bWFudGVjIFRpbWUgU3Rh
 # bXBpbmcgU2VydmljZXMgQ0EgLSBHMgIQDs/0OMj+vzVuBNhqmBsaUDAJBgUrDgMC
 # GgUAoF0wGAYJKoZIhvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcN
-# MjAwNTIwMTM0MzE2WjAjBgkqhkiG9w0BCQQxFgQUNHljh0VLrrH4wz85kVzfGbww
-# uXIwDQYJKoZIhvcNAQEBBQAEggEAjDClMBinMY2uBcca2tUcb2+Pe4QQyDq/A6Te
-# Hsv7VqLxrbY7Ax+Nm3UGkFn44rRgPxF53Zueujcbf9dgzWpWLwrW1aedybLvkywy
-# Rvi4u7qCNWhjmZuqolklTN6b186G8Mpfjqcf2LmyvD8/qEYyUdLus3I9K9KrOttb
-# cPJOJiD/T/RGTIBUa/TSi2xgCI7QeV6TABgUUFhU70IYWq9BYRvqeynQ70nt/xDU
-# BwXcJgYce7RKNXuSRAU3SKLDfk6mRFzVmV7YTAYr1k3+SeivQ4avAEp429X582ks
-# ILaKCLi1dRTARndiAs0Sy1n3AiL1/Lr+WU5z/19aoWGZThacKg==
+# MjAwNzI5MTQzMjMwWjAjBgkqhkiG9w0BCQQxFgQUdzTtEp2x1WsOPREqoVJKsyaa
+# DsowDQYJKoZIhvcNAQEBBQAEggEAhTHF2fCko5o9Klfy3btAbrgrbePVst+aT1cV
+# XFIVgnZHzMpfXRDUGiZu6gG2v6CoTqJsmppXCAY7Kvd6CGQW1s0CreSmQyCTCQ2D
+# rE8qo1+wEq/4GJTQVLpGSxK2vK2IRrcOxfi11mHea48IuasRAhu5LuGF2bOkSo7V
+# T43pgEw+shUI9CevtfQQKR1TgQmKnacywGkVnaoIySpXKMvzYGDTgFqMCKqS1VEe
+# S27hZQdZeAu9e+Tqbg1R3s1nU3WEbUCV3aylU29zitWN1e4AX8Etvgammo8BtdCa
+# D65+mtNp5CwQQT81qDtmhX38joC0cgAr7ba7eaiFkLAtU0fmJA==
 # SIG # End signature block

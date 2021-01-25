@@ -59,7 +59,7 @@
         "DotNetHostingDownload": {
             "Type": "String",
             "Description": "Download location of .net core 2.1.x Hosting Bundle",
-            "DefaultValue": "https://download.visualstudio.microsoft.com/download/pr/633b17e5-a489-4da4-9713-5ddedf17a5f0/5c18f4203e837dd90ba3da59eee92b01/dotnet-hosting-2.1.15-win.exe"
+            "DefaultValue": "https://download.visualstudio.microsoft.com/download/pr/3e3c37fb-4d77-4558-a78c-17434e1cc804/60116643f610fb43f858af4e0dc1b223/dotnet-hosting-2.1.23-win.exe"
         },
         "DotNet4RegistryLocation": {
             "Type": "String",
