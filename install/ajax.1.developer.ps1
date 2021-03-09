@@ -1,8 +1,28 @@
 ## Customized
+Function Resolve-ItemPath {
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullorEmpty()]
+        [string] $Path
+    )
+    process {
+        if ([string]::IsNullOrWhiteSpace($Path)) {
+            throw "Parameter could not be validated because it contains only whitespace. Please check script parameters."
+        }
+        $itemPath = Resolve-Path -Path $Path -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ([string]::IsNullOrEmpty($itemPath) -or (-not (Test-Path $itemPath))) {
+            throw "Path [$Path] could not be resolved. Please check script parameters."
+        }
+
+        Write-Host "Found [$itemPath]."
+        return $itemPath
+    }
+}
+
 # Solr Port.
-$SolrPort = "6983"
+$SolrPort = "8983"
 # Solr installation root.
-$SolrInstallRoot = "C:\"
+$SolrInstallRoot = "$($Env:SYSTEMDRIVE)\"
 # Solr version
 $SolrVersion = "8.4.0"
 ##
@@ -12,9 +32,9 @@ $Prefix = "ajax"
 # The Password for the Sitecore Admin User. This will be regenerated if left on the default.
 $SitecoreAdminPassword = "b"
 # The root folder with the license file and WDP files.
-$SCInstallRoot = "C:\git\sxp10\install\XP"
+$SCInstallRoot = "$PSScriptRoot\sxp"
 # Root folder to install the site to. If left on the default [systemdrive]:\\inetpub\\wwwroot will be used
-$SitePhysicalRoot = "C:\git\sxp10\www"
+$SitePhysicalRoot = Resolve-ItemPath -Path "$PSScriptRoot\..\www"
 # The name for the XConnect service.
 $XConnectSiteName = "$prefix.xconnect"
 # The Sitecore site instance name.
@@ -22,7 +42,7 @@ $SitecoreSiteName = "$prefix.cm"
 # Identity Server site name
 $IdentityServerSiteName = "$prefix.identityserver"
 # The Path to the license file
-$LicenseFile = "$SCInstallRoot\license.xml"
+$LicenseFile = Resolve-ItemPath -Path "$PSScriptRoot\license.xml"
 # The URL of the Solr Server
 $SolrUrl = "https://localhost:$SolrPort/solr"
 # The Folder that Solr has been installed to.
@@ -58,6 +78,8 @@ $SitecoreXP1CDPackage = (Get-ChildItem "$SCInstallRoot\Sitecore * rev. * (OnPrem
 # The Sitecore CD instance name.
 $SitecoreXP1CDSitename = "$Prefix.cd"
 ##
+
+Push-Location $PSScriptRoot\sxp
 
 # Install SOLR
 $solrParams = @{
@@ -101,8 +123,6 @@ $singleDeveloperParams = @{
     SitecoreXP1CDSitename = $SitecoreXP1CDSitename
 ##
 }
-
-Push-Location $SCInstallRoot
 
 Install-SitecoreConfiguration @singleDeveloperParams *>&1 | Tee-Object XP0-SingleDeveloper.log
 
